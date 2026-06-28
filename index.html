@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Solar Run 3D</title>
+    <title>Solar Run 3D Ultra Smooth</title>
     <style>
         * {
             box-sizing: border-box;
@@ -55,16 +55,17 @@
         const ctx = canvas.getContext("2d");
         const scoreDisplay = document.getElementById("score");
 
+        // Dynamic Adjustments
         canvas.width = window.innerWidth > 430 ? 420 : window.innerWidth;
         canvas.height = window.innerHeight > 800 ? 720 : window.innerHeight;
 
         let score = 0;
         let gameOver = false;
         let gameStarted = false;
-        let speed = 7.5;
-        let solarAnimationOffset = 0; // Road panels ko chalta hua dikhane ke liye
+        let speed = 7.0;
+        let solarAnimationOffset = 0;
 
-        // Player Ball (Bigger & Glowing)
+        // Big Ball with Anti-Lag Snapping
         const ball = {
             x: canvas.width / 2,
             y: canvas.height - 180,
@@ -73,7 +74,6 @@
             targetX: canvas.width / 2
         };
 
-        // Wide Solar Road Config
         const road = {
             topW: 100,
             botW: 350, 
@@ -86,7 +86,6 @@
 
         function spawnItem() {
             if (gameOver || !gameStarted) return;
-            
             const lane = Math.floor(Math.random() * 3);
             const isObstacle = Math.random() > 0.45;
 
@@ -98,11 +97,11 @@
             });
         }
 
-        function moveBall(e) {
+        // Improved Smooth Touch Controls (Prevents Glitch/Freezing)
+        function handleInput(clientX) {
             if (gameOver) return;
             if (!gameStarted) gameStarted = true;
 
-            let clientX = e.touches ? e.touches[0].clientX : e.clientX;
             const rect = canvas.getBoundingClientRect();
             const relativeX = clientX - rect.left;
 
@@ -115,18 +114,22 @@
             }
         }
 
-        window.addEventListener("mousemove", moveBall);
-        window.addEventListener("touchmove", moveBall, { passive: false });
-        
+        window.addEventListener("mousemove", (e) => handleInput(e.clientX));
+        window.addEventListener("touchmove", (e) => {
+            if(e.touches.length > 0) {
+                handleInput(e.touches[0].clientX);
+            }
+        }, { passive: true });
+
         window.addEventListener("click", () => { if (gameOver) resetGame(); });
-        window.addEventListener("touchstart", () => { if (gameOver) resetGame(); });
+        window.addEventListener("touchstart", () => { if (gameOver) resetGame(); }, { passive: true });
 
         function resetGame() {
             score = 0;
             scoreDisplay.innerText = score;
             gameOver = false;
             gameStarted = false;
-            speed = 7.5;
+            speed = 7.0;
             items = [];
             ball.x = canvas.width / 2;
             ball.targetX = canvas.width / 2;
@@ -135,15 +138,16 @@
         function update() {
             if (!gameStarted || gameOver) return;
 
-            ball.x += (ball.targetX - ball.x) * 0.28;
-            speed += 0.003; 
-            
-            // Solar grid moving speed animation
+            // Smooth interpolation that prevents snapping lags
+            ball.x += (ball.targetX - ball.x) * 0.30;
+            if(Math.abs(ball.x - ball.targetX) < 1) ball.x = ball.targetX;
+
+            speed += 0.002; 
             solarAnimationOffset += speed * 0.5;
 
             for (let i = items.length - 1; i >= 0; i--) {
                 let it = items[i];
-                it.progress += speed * 0.0024; 
+                it.progress += speed * 0.0022; 
 
                 let currentY = road.topY + (road.botY - road.topY) * it.progress;
                 let currentRoadWidth = road.topW + (road.botW - road.topW) * it.progress;
@@ -151,11 +155,12 @@
                 let laneWidth = currentRoadWidth / 3;
                 let currentX = currentLeftX + (it.lane * laneWidth) + laneWidth / 2;
 
-                if (it.progress >= 0.78 && it.progress <= 0.92) {
+                // Fixed precise hitbox trigger
+                if (it.progress >= 0.80 && it.progress <= 0.92) {
                     let distance = Math.abs(ball.x - currentX);
                     let itemSize = 14 * (it.progress * 2.8);
                     
-                    if (distance < ball.radius + (itemSize / 2)) {
+                    if (distance < ball.radius + (itemSize / 2.2)) {
                         if (it.type === "obstacle") {
                             gameOver = true;
                         } else {
@@ -178,9 +183,8 @@
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // 1. SOLAR PANEL ROAD DRAWING
-            ctx.save();
-            ctx.fillStyle = "#0c1020"; // Dark Blue Solar Base
+            // Solar Road Base
+            ctx.fillStyle = "#0c1020"; 
             ctx.beginPath();
             ctx.moveTo(road.topX - road.topW / 2, road.topY);
             ctx.lineTo(road.topX + road.topW / 2, road.topY);
@@ -189,8 +193,8 @@
             ctx.closePath();
             ctx.fill();
 
-            // Solar Grid Horizontal lines (Moving effect)
-            ctx.strokeStyle = "#00f2fe"; // Electric Cyan
+            // Solar Lines
+            ctx.strokeStyle = "#00f2fe"; 
             ctx.lineWidth = 1.5;
             for (let y = road.topY; y < road.botY; y += 35) {
                 let movingY = y + (solarAnimationOffset % 35);
@@ -205,7 +209,7 @@
                 ctx.stroke();
             }
 
-            // Solar Grid Vertical Lane dividers
+            // Lane Borders
             ctx.lineWidth = 3;
             for (let l = 1; l <= 2; l++) {
                 ctx.beginPath();
@@ -214,20 +218,17 @@
                 ctx.stroke();
             }
 
-            // Outer Neon Solar Glowing Borders
+            // Outer Neon Frame
             ctx.strokeStyle = "#00f2fe";
             ctx.lineWidth = 5;
-            ctx.shadowBlur = 15;
-            ctx.shadowColor = "#00f2fe";
             ctx.beginPath();
             ctx.moveTo(road.topX - road.topW / 2, road.topY);
             ctx.lineTo(road.topX - road.botW / 2, road.botY);
             ctx.moveTo(road.topX + road.topW / 2, road.topY);
             ctx.lineTo(road.topX + road.botW / 2, road.botY);
             ctx.stroke();
-            ctx.restore();
 
-            // 2. BIGGER 3D OBSTACLES & SCI-FI CRYSTALS
+            // Render Items
             items.forEach(it => {
                 let currentY = road.topY + (road.botY - road.topY) * it.progress;
                 let currentRoadWidth = road.topW + (road.botW - road.topW) * it.progress;
@@ -238,18 +239,14 @@
                 let size = 15 * (it.progress * 2.8); 
 
                 ctx.save();
-                ctx.shadowBlur = 20;
-                ctx.shadowColor = it.color;
                 ctx.fillStyle = it.color;
 
                 if (it.type === "obstacle") {
-                    // Cyber Laser Grid Block
                     ctx.fillRect(currentX - size/2, currentY - size, size, size);
                     ctx.strokeStyle = "#fff";
                     ctx.lineWidth = 2;
                     ctx.strokeRect(currentX - size/2, currentY - size, size, size);
                 } else {
-                    // Glowing Plasma Energy Gem
                     ctx.beginPath();
                     ctx.moveTo(currentX, currentY - size);
                     ctx.lineTo(currentX + size/1.5, currentY - size/2);
@@ -261,23 +258,20 @@
                 ctx.restore();
             });
 
-            // 3. GLOWING ENERGY PLAYER BALL
+            // Player Ball
             ctx.save();
             let gradient = ctx.createRadialGradient(ball.x - 7, ball.y - 7, 3, ball.x, ball.y, ball.radius);
             gradient.addColorStop(0, '#fff');
             gradient.addColorStop(0.5, ball.color);
             gradient.addColorStop(1, '#66001f');
             
-            ctx.shadowBlur = 30;
-            ctx.shadowColor = ball.color;
             ctx.fillStyle = gradient;
-            
             ctx.beginPath();
             ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
             ctx.fill();
             ctx.restore();
 
-            // 4. SCREEN OVERLAYS
+            // UI Overlays
             if (!gameStarted && !gameOver) {
                 ctx.fillStyle = "rgba(0,0,0,0.7)";
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -306,7 +300,7 @@
             draw();
 
             spawnTimer++;
-            if (spawnTimer > 30) { 
+            if (spawnTimer > 34) { 
                 spawnItem();
                 spawnTimer = 0;
             }

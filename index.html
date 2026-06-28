@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Ball Run 3D Big & Real</title>
+    <title>Solar Run 3D</title>
     <style>
         * {
             box-sizing: border-box;
@@ -11,7 +11,7 @@
             padding: 0;
         }
         body {
-            background: #06060c;
+            background: #020205;
             font-family: 'Arial Black', sans-serif;
             overflow: hidden;
             display: flex;
@@ -22,10 +22,10 @@
         }
         #gameContainer {
             position: relative;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.9);
+            box-shadow: 0 25px 65px rgba(0, 242, 254, 0.25);
         }
         canvas {
-            background: linear-gradient(to bottom, #0f172a, #020617);
+            background: linear-gradient(to bottom, #070a1e, #010206);
             display: block;
             border-radius: 16px;
         }
@@ -35,9 +35,9 @@
             width: 100%;
             text-align: center;
             color: #fff;
-            font-size: 32px;
+            font-size: 35px;
             font-weight: 900;
-            text-shadow: 3px 3px 6px rgba(0,0,0,0.8);
+            text-shadow: 0 0 12px #00f2fe;
             pointer-events: none;
             z-index: 10;
         }
@@ -55,28 +55,28 @@
         const ctx = canvas.getContext("2d");
         const scoreDisplay = document.getElementById("score");
 
-        // Dynamic Screen Adjustment for Mobile
         canvas.width = window.innerWidth > 430 ? 420 : window.innerWidth;
         canvas.height = window.innerHeight > 800 ? 720 : window.innerHeight;
 
         let score = 0;
         let gameOver = false;
         let gameStarted = false;
-        let speed = 7; // Thoda fast aur exciting speed
+        let speed = 7.5;
+        let solarAnimationOffset = 0; // Road panels ko chalta hua dikhane ke liye
 
-        // BIGGER BALL (Size 16 se badha kar 24 kar diya)
+        // Player Ball (Bigger & Glowing)
         const ball = {
             x: canvas.width / 2,
             y: canvas.height - 180,
             radius: 24, 
-            color: "#ff3333",
+            color: "#ff2a5f",
             targetX: canvas.width / 2
         };
 
-        // MUCH WIDER ROAD (BotW 240 se badha kar 340 kiya - Ekdum Choura)
+        // Wide Solar Road Config
         const road = {
-            topW: 90,
-            botW: 340, 
+            topW: 100,
+            botW: 350, 
             topX: canvas.width / 2,
             topY: 180,
             botY: canvas.height
@@ -87,18 +87,17 @@
         function spawnItem() {
             if (gameOver || !gameStarted) return;
             
-            const lane = Math.floor(Math.random() * 3); // 0: Left, 1: Center, 2: Right
-            const isObstacle = Math.random() > 0.4; // 60% Blocks, 40% Diamonds
+            const lane = Math.floor(Math.random() * 3);
+            const isObstacle = Math.random() > 0.45;
 
             items.push({
                 lane: lane,
                 progress: 0, 
                 type: isObstacle ? "obstacle" : "diamond",
-                color: isObstacle ? "#00f0ff" : "#ffd700"
+                color: isObstacle ? "#ff3333" : "#00ffcc"
             });
         }
 
-        // Smooth Touch / Drag Controls
         function moveBall(e) {
             if (gameOver) return;
             if (!gameStarted) gameStarted = true;
@@ -107,13 +106,12 @@
             const rect = canvas.getBoundingClientRect();
             const relativeX = clientX - rect.left;
 
-            // Wide road ke hisab se lane positioning
             if (relativeX < canvas.width * 0.35) {
-                ball.targetX = canvas.width / 2 - 95; // Left Lane
+                ball.targetX = canvas.width / 2 - 95; 
             } else if (relativeX > canvas.width * 0.65) {
-                ball.targetX = canvas.width / 2 + 95; // Right Lane
+                ball.targetX = canvas.width / 2 + 95; 
             } else {
-                ball.targetX = canvas.width / 2;      // Center Lane
+                ball.targetX = canvas.width / 2;      
             }
         }
 
@@ -128,7 +126,7 @@
             scoreDisplay.innerText = score;
             gameOver = false;
             gameStarted = false;
-            speed = 7;
+            speed = 7.5;
             items = [];
             ball.x = canvas.width / 2;
             ball.targetX = canvas.width / 2;
@@ -137,9 +135,11 @@
         function update() {
             if (!gameStarted || gameOver) return;
 
-            // Smooth Lateral Slide
             ball.x += (ball.targetX - ball.x) * 0.28;
             speed += 0.003; 
+            
+            // Solar grid moving speed animation
+            solarAnimationOffset += speed * 0.5;
 
             for (let i = items.length - 1; i >= 0; i--) {
                 let it = items[i];
@@ -151,7 +151,6 @@
                 let laneWidth = currentRoadWidth / 3;
                 let currentX = currentLeftX + (it.lane * laneWidth) + laneWidth / 2;
 
-                // Accurate Collision with Larger Hitbox
                 if (it.progress >= 0.78 && it.progress <= 0.92) {
                     let distance = Math.abs(ball.x - currentX);
                     let itemSize = 14 * (it.progress * 2.8);
@@ -179,8 +178,9 @@
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // 1. CHOURI ROAD
-            ctx.fillStyle = "#1e293b";
+            // 1. SOLAR PANEL ROAD DRAWING
+            ctx.save();
+            ctx.fillStyle = "#0c1020"; // Dark Blue Solar Base
             ctx.beginPath();
             ctx.moveTo(road.topX - road.topW / 2, road.topY);
             ctx.lineTo(road.topX + road.topW / 2, road.topY);
@@ -189,8 +189,23 @@
             ctx.closePath();
             ctx.fill();
 
-            // 3D Lane Lines
-            ctx.strokeStyle = "rgba(255, 255, 255, 0.18)";
+            // Solar Grid Horizontal lines (Moving effect)
+            ctx.strokeStyle = "#00f2fe"; // Electric Cyan
+            ctx.lineWidth = 1.5;
+            for (let y = road.topY; y < road.botY; y += 35) {
+                let movingY = y + (solarAnimationOffset % 35);
+                if (movingY > road.botY) continue;
+                
+                let p = (movingY - road.topY) / (road.botY - road.topY);
+                let currentW = road.topW + (road.botW - road.topW) * p;
+                
+                ctx.beginPath();
+                ctx.moveTo(road.topX - currentW / 2, movingY);
+                ctx.lineTo(road.topX + currentW / 2, movingY);
+                ctx.stroke();
+            }
+
+            // Solar Grid Vertical Lane dividers
             ctx.lineWidth = 3;
             for (let l = 1; l <= 2; l++) {
                 ctx.beginPath();
@@ -199,17 +214,20 @@
                 ctx.stroke();
             }
 
-            // Side Borders (Neon Cyber Look)
-            ctx.strokeStyle = "#38bdf8";
+            // Outer Neon Solar Glowing Borders
+            ctx.strokeStyle = "#00f2fe";
             ctx.lineWidth = 5;
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = "#00f2fe";
             ctx.beginPath();
             ctx.moveTo(road.topX - road.topW / 2, road.topY);
             ctx.lineTo(road.topX - road.botW / 2, road.botY);
             ctx.moveTo(road.topX + road.topW / 2, road.topY);
             ctx.lineTo(road.topX + road.botW / 2, road.botY);
             ctx.stroke();
+            ctx.restore();
 
-            // 2. BIGGER 3D OBSTACLES & GEMS
+            // 2. BIGGER 3D OBSTACLES & SCI-FI CRYSTALS
             items.forEach(it => {
                 let currentY = road.topY + (road.botY - road.topY) * it.progress;
                 let currentRoadWidth = road.topW + (road.botW - road.topW) * it.progress;
@@ -217,41 +235,40 @@
                 let laneWidth = currentRoadWidth / 3;
                 let currentX = currentLeftX + (it.lane * laneWidth) + laneWidth / 2;
                 
-                // Bigger Scale factor (2.8)
-                let size = 14 * (it.progress * 2.8); 
+                let size = 15 * (it.progress * 2.8); 
 
                 ctx.save();
-                ctx.shadowBlur = 15;
+                ctx.shadowBlur = 20;
                 ctx.shadowColor = it.color;
                 ctx.fillStyle = it.color;
 
                 if (it.type === "obstacle") {
-                    // Big 3D Block Wall
+                    // Cyber Laser Grid Block
                     ctx.fillRect(currentX - size/2, currentY - size, size, size);
-                    ctx.strokeStyle = "#ffffff";
-                    ctx.lineWidth = 1.5;
+                    ctx.strokeStyle = "#fff";
+                    ctx.lineWidth = 2;
                     ctx.strokeRect(currentX - size/2, currentY - size, size, size);
                 } else {
-                    // Big Diamond
+                    // Glowing Plasma Energy Gem
                     ctx.beginPath();
                     ctx.moveTo(currentX, currentY - size);
-                    ctx.lineTo(currentX + size/1.6, currentY - size/2);
+                    ctx.lineTo(currentX + size/1.5, currentY - size/2);
                     ctx.lineTo(currentX, currentY);
-                    ctx.lineTo(currentX - size/1.6, currentY - size/2);
+                    ctx.lineTo(currentX - size/1.5, currentY - size/2);
                     ctx.closePath();
                     ctx.fill();
                 }
                 ctx.restore();
             });
 
-            // 3. BIGGER 3D BALL
+            // 3. GLOWING ENERGY PLAYER BALL
             ctx.save();
             let gradient = ctx.createRadialGradient(ball.x - 7, ball.y - 7, 3, ball.x, ball.y, ball.radius);
-            gradient.addColorStop(0, '#ff8a80');
-            gradient.addColorStop(0.7, ball.color);
-            gradient.addColorStop(1, '#7f0000');
+            gradient.addColorStop(0, '#fff');
+            gradient.addColorStop(0.5, ball.color);
+            gradient.addColorStop(1, '#66001f');
             
-            ctx.shadowBlur = 25;
+            ctx.shadowBlur = 30;
             ctx.shadowColor = ball.color;
             ctx.fillStyle = gradient;
             
@@ -260,26 +277,26 @@
             ctx.fill();
             ctx.restore();
 
-            // 4. Game Screen Text
+            // 4. SCREEN OVERLAYS
             if (!gameStarted && !gameOver) {
-                ctx.fillStyle = "rgba(0,0,0,0.6)";
+                ctx.fillStyle = "rgba(0,0,0,0.7)";
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = "#fff";
+                ctx.fillStyle = "#00f2fe";
                 ctx.font = "bold 20px Arial";
                 ctx.textAlign = "center";
-                ctx.fillText("SWIPE LEFT / RIGHT TO START", canvas.width / 2, canvas.height / 2);
+                ctx.fillText("SWIPE TO RUN ON SOLAR GRID", canvas.width / 2, canvas.height / 2);
             }
 
             if (gameOver) {
-                ctx.fillStyle = "rgba(2, 6, 23, 0.9)";
+                ctx.fillStyle = "rgba(2, 4, 15, 0.92)";
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = "#ef4444";
+                ctx.fillStyle = "#ff2a5f";
                 ctx.font = "bold 38px Arial";
                 ctx.textAlign = "center";
-                ctx.fillText("GAME OVER", canvas.width / 2, canvas.height / 2 - 20);
+                ctx.fillText("SYSTEM CRASH", canvas.width / 2, canvas.height / 2 - 20);
                 ctx.fillStyle = "#fff";
                 ctx.font = "bold 18px Arial";
-                ctx.fillText("Tap to Try Again", canvas.width / 2, canvas.height / 2 + 30);
+                ctx.fillText("Tap to Reboot", canvas.width / 2, canvas.height / 2 + 30);
             }
         }
 
@@ -289,7 +306,7 @@
             draw();
 
             spawnTimer++;
-            if (spawnTimer > 32) { 
+            if (spawnTimer > 30) { 
                 spawnItem();
                 spawnTimer = 0;
             }

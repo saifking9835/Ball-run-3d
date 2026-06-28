@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Flappy Dunk Real Match</title>
+    <title>Ball Run 3D Original</title>
     <style>
         * {
             box-sizing: border-box;
@@ -11,7 +11,7 @@
             padding: 0;
         }
         body {
-            background: #121214;
+            background: #050508;
             font-family: 'Arial Black', sans-serif;
             overflow: hidden;
             display: flex;
@@ -22,22 +22,32 @@
         }
         #gameContainer {
             position: relative;
-            box-shadow: 0 12px 40px rgba(0,0,0,0.7);
+            box-shadow: 0 15px 50px rgba(0,0,0,0.8);
         }
         canvas {
-            background: linear-gradient(to bottom, #2c3e50, #000000);
+            background: linear-gradient(to bottom, #111827, #030712);
             display: block;
-            border-radius: 12px;
+            border-radius: 16px;
         }
         #scoreBoard {
             position: absolute;
-            top: 40px;
+            top: 25px;
+            left: 20px;
+            color: #fff;
+            font-size: 28px;
+            font-weight: 900;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.6);
+            pointer-events: none;
+            z-index: 10;
+        }
+        #instructions {
+            position: absolute;
+            bottom: 40px;
             width: 100%;
             text-align: center;
-            color: #fff;
-            font-size: 65px;
-            font-weight: 900;
-            text-shadow: 3px 3px 0px #ff4500;
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 14px;
+            letter-spacing: 1px;
             pointer-events: none;
             z-index: 10;
         }
@@ -46,233 +56,257 @@
 <body>
 
     <div id="gameContainer">
-        <div id="scoreBoard">0</div>
+        <div id="scoreBoard">SCORE: <span id="score">0</span></div>
+        <div id="instructions">SWIPE LEFT / RIGHT TO RUN</div>
         <canvas id="gameCanvas"></canvas>
     </div>
 
     <script>
         const canvas = document.getElementById("gameCanvas");
         const ctx = canvas.getContext("2d");
-        const scoreBoard = document.getElementById("scoreBoard");
+        const scoreDisplay = document.getElementById("score");
 
-        // Mobile Responsive Setup
+        // Mobile Screen Size Configuration
         canvas.width = window.innerWidth > 430 ? 400 : window.innerWidth;
         canvas.height = window.innerHeight > 800 ? 700 : window.innerHeight;
 
         let score = 0;
         let gameOver = false;
         let gameStarted = false;
+        let speed = 6;
 
-        // Ball with Trail and Wings
+        // 3D Ball Properties
         const ball = {
-            x: canvas.width * 0.28,
-            y: canvas.height / 2,
-            radius: 14,
-            gravity: 0.34,
-            lift: -6.4,
-            velocity: 0,
-            trail: [],
-            wingAngle: 0
+            x: canvas.width / 2,
+            y: canvas.height - 160,
+            radius: 16,
+            color: "#ff3b30",
+            targetX: canvas.width / 2
         };
 
-        // Rings/Hoops List
-        let rings = [];
-        const ringWidth = 75;
+        // 3D Road / Track Layout
+        const road = {
+            topW: 60,
+            botW: 240,
+            topX: canvas.width / 2,
+            topY: 200,
+            botY: canvas.height
+        };
 
-        function spawnRing(first = false) {
-            let xPosition = first ? canvas.width * 0.75 : canvas.width + 120;
-            let minY = 180;
-            let maxY = canvas.height - 180;
-            let yPosition = Math.floor(Math.random() * (maxY - minY)) + minY;
+        // Hurdles (Rukawatein) & Diamonds
+        let items = [];
+
+        function spawnItem() {
+            if (gameOver || !gameStarted) return;
             
-            rings.push({
-                x: xPosition,
-                y: yPosition,
-                passed: false,
-                tilt: (Math.random() * 30 - 15) * Math.PI / 180 // Real Tilt Angle
+            // 0: Left lane, 1: Center lane, 2: Right lane
+            const lane = Math.floor(Math.random() * 3);
+            const isObstacle = Math.random() > 0.35; // 65% Obstacles, 35% Diamonds
+
+            items.push({
+                lane: lane,
+                progress: 0, // 0 (far away) to 1 (close to player)
+                type: isObstacle ? "obstacle" : "diamond",
+                color: isObstacle ? "#00f2fe" : "#ffd700"
             });
         }
 
-        function bounce() {
-            if (gameOver) {
-                resetGame();
-                return;
-            }
+        // Left/Right Touch and Drag Controls
+        function moveBall(e) {
+            if (gameOver) return;
             if (!gameStarted) gameStarted = true;
-            ball.velocity = ball.lift;
+
+            let clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const rect = canvas.getBoundingClientRect();
+            const relativeX = clientX - rect.left;
+
+            // Divide road into 3 parts based on touch position
+            if (relativeX < canvas.width * 0.38) {
+                ball.targetX = canvas.width / 2 - 60; // Left Lane
+            } else if (relativeX > canvas.width * 0.62) {
+                ball.targetX = canvas.width / 2 + 60; // Right Lane
+            } else {
+                ball.targetX = canvas.width / 2;      // Center Lane
+            }
         }
 
-        // Controls
-        window.addEventListener("keydown", (e) => { if (e.code === "Space") bounce(); });
-        canvas.addEventListener("touchstart", (e) => { e.preventDefault(); bounce(); }, {passive: false});
-        canvas.addEventListener("mousedown", bounce);
+        window.addEventListener("mousemove", moveBall);
+        window.addEventListener("touchmove", moveBall, { passive: false });
+        
+        // Tap to restart
+        window.addEventListener("click", () => { if (gameOver) resetGame(); });
+        window.addEventListener("touchstart", () => { if (gameOver) resetGame(); });
 
         function resetGame() {
-            ball.y = canvas.height / 2;
-            ball.velocity = 0;
-            ball.trail = [];
-            rings = [];
             score = 0;
-            scoreBoard.innerText = score;
+            scoreDisplay.innerText = score;
             gameOver = false;
             gameStarted = false;
-            
-            spawnRing(true);
-            spawnRing();
+            speed = 6;
+            items = [];
+            ball.x = canvas.width / 2;
+            ball.targetX = canvas.width / 2;
         }
 
+        // Logic Update Engine
         function update() {
             if (!gameStarted || gameOver) return;
 
-            ball.velocity += ball.gravity;
-            ball.y += ball.velocity;
-            ball.wingAngle += 0.28;
+            // Smooth Ball Lateral Movement
+            ball.x += (ball.targetX - ball.x) * 0.25;
+            speed += 0.002; // Speed slowly increases
 
-            // Trail positions
-            ball.trail.push({ x: ball.x, y: ball.y });
-            if (ball.trail.length > 12) ball.trail.shift();
+            for (let i = items.length - 1; i >= 0; i--) {
+                let it = items[i];
+                it.progress += speed * 0.0025; // Move items down the road
 
-            // Floor and Roof crash
-            if (ball.y + ball.radius >= canvas.height || ball.y - ball.radius <= 0) {
-                gameOver = true;
-            }
+                // Calculate current screen coordinates based on 3D perspective
+                let currentY = road.topY + (road.botY - road.topY) * it.progress;
+                let currentRoadWidth = road.topW + (road.botW - road.topW) * it.progress;
+                let currentLeftX = road.topX - currentRoadWidth / 2;
+                let laneWidth = currentRoadWidth / 3;
+                let currentX = currentLeftX + (it.lane * laneWidth) + laneWidth / 2;
 
-            // Ring logic
-            let currentSpeed = 2.5 + (score * 0.05);
-            for (let i = rings.length - 1; i >= 0; i--) {
-                rings[i].x -= currentSpeed;
-
-                let r = rings[i];
-                let rLeft = r.x - ringWidth / 2;
-                let rRight = r.x + ringWidth / 2;
-
-                // Accurate center dunk detection
-                if (!r.passed && ball.x > rLeft && ball.x < rRight) {
-                    if (Math.abs(ball.y - r.y) < 12) {
-                        r.passed = true;
-                        score++;
-                        scoreBoard.innerText = score;
+                // Collision Check (When item reaches close to ball Y)
+                if (it.progress >= 0.82 && it.progress <= 0.92) {
+                    let distance = Math.abs(ball.x - currentX);
+                    if (distance < ball.radius + (12 * it.progress)) {
+                        if (it.type === "obstacle") {
+                            gameOver = true;
+                        } else {
+                            // Collected Diamond
+                            score += 10;
+                            scoreDisplay.innerText = score;
+                            items.splice(i, 1);
+                            continue;
+                        }
                     }
                 }
 
-                // Missed ring check
-                if (!r.passed && (r.x + ringWidth/2) < (ball.x - ball.radius)) {
-                    gameOver = true;
-                }
-
-                if (r.x + ringWidth < -60) {
-                    rings.splice(i, 1);
-                    spawnRing();
+                // Remove out of bound items
+                if (it.progress > 1.0) {
+                    if (it.type === "obstacle") score += 1; // Dodge point
+                    scoreDisplay.innerText = score;
+                    items.splice(i, 1);
                 }
             }
         }
 
+        // Render Frame
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Draw Neon Dot Trails
-            ball.trail.forEach((t, index) => {
-                ctx.beginPath();
-                ctx.arc(t.x, t.y, ball.radius * (index / ball.trail.length), 0, Math.PI * 2);
-                ctx.fillStyle = `rgba(255, 255, 255, ${index / 16})`;
-                ctx.fill();
-            });
+            // 1. Draw 3D Perspective Road
+            ctx.fillStyle = "#1f2937";
+            ctx.beginPath();
+            ctx.moveTo(road.topX - road.topW / 2, road.topY);
+            ctx.lineTo(road.topX + road.topW / 2, road.topY);
+            ctx.lineTo(road.topX + road.botW / 2, road.botY);
+            ctx.lineTo(road.topX - road.botW / 2, road.botY);
+            ctx.closePath();
+            ctx.fill();
 
-            // Draw Rings
-            rings.forEach(r => {
+            // 3D Lane Dividers lines
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.15)";
+            ctx.lineWidth = 2;
+            for (let l = 1; l <= 2; l++) {
+                ctx.beginPath();
+                ctx.moveTo(road.topX - road.topW / 2 + (road.topW / 3) * l, road.topY);
+                ctx.lineTo(road.topX - road.botW / 2 + (road.botW / 3) * l, road.botY);
+                ctx.stroke();
+            }
+
+            // Side Glowing Rails
+            ctx.strokeStyle = "#ff007f";
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.moveTo(road.topX - road.topW / 2, road.topY);
+            ctx.lineTo(road.topX - road.botW / 2, road.botY);
+            ctx.moveTo(road.topX + road.topW / 2, road.topY);
+            ctx.lineTo(road.topX + road.botW / 2, road.botY);
+            ctx.stroke();
+
+            // 2. Draw Obstacles & Diamonds with 3D Scaling
+            items.forEach(it => {
+                let currentY = road.topY + (road.botY - road.topY) * it.progress;
+                let currentRoadWidth = road.topW + (road.botW - road.topW) * it.progress;
+                let currentLeftX = road.topX - currentRoadWidth / 2;
+                let laneWidth = currentRoadWidth / 3;
+                let currentX = currentLeftX + (it.lane * laneWidth) + laneWidth / 2;
+                
+                let size = 10 * (it.progress * 2); // Scales up as it gets closer
+
                 ctx.save();
-                ctx.translate(r.x, r.y);
-                ctx.rotate(r.tilt);
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = it.color;
+                ctx.fillStyle = it.color;
 
-                // Dotted Mesh Net
-                ctx.strokeStyle = "rgba(255, 255, 255, 0.25)";
-                ctx.lineWidth = 2.5;
-                ctx.setLineDash([4, 4]);
-                ctx.beginPath();
-                ctx.moveTo(-ringWidth / 2 + 6, 0);
-                ctx.lineTo(-ringWidth / 3, 42);
-                ctx.lineTo(ringWidth / 3, 42);
-                ctx.lineTo(ringWidth / 2 - 6, 0);
-                ctx.stroke();
-                ctx.setLineDash([]);
-
-                // Glowing Neon Rim Hoop
-                ctx.strokeStyle = "#ff4e00";
-                ctx.lineWidth = 7.5;
-                ctx.lineCap = "round";
-                ctx.beginPath();
-                ctx.moveTo(-ringWidth / 2, 0);
-                ctx.lineTo(ringWidth / 2, 0);
-                ctx.stroke();
-
+                if (it.type === "obstacle") {
+                    // Draw 3D-like Hazard block
+                    ctx.fillRect(currentX - size/2, currentY - size, size, size);
+                } else {
+                    // Draw Crystal/Diamond
+                    ctx.beginPath();
+                    ctx.moveTo(currentX, currentY - size);
+                    ctx.lineTo(currentX + size/2, currentY - size/2);
+                    ctx.lineTo(currentX, currentY);
+                    ctx.lineTo(currentX - size/2, currentY - size/2);
+                    ctx.closePath();
+                    ctx.fill();
+                }
                 ctx.restore();
             });
 
-            // Draw Basketball with Shading & Wings
+            // 3. Draw Player 3D Rolling Ball
             ctx.save();
-            ctx.translate(ball.x, ball.y);
-
-            // Flapping Wings
-            ctx.fillStyle = "#ffffff";
-            ctx.strokeStyle = "#000000";
-            ctx.lineWidth = 2;
-            ctx.save();
-            ctx.translate(-12, -4);
-            ctx.rotate(-Math.sin(ball.wingAngle) * 0.5 - 0.3);
-            ctx.beginPath(); 
-            ctx.ellipse(0, 0, 14, 6.5, 0, 0, Math.PI * 2); 
-            ctx.fill(); 
-            ctx.stroke();
-            ctx.restore();
-
-            // Basketball Color Shading
-            let radGrad = ctx.createRadialGradient(-3, -3, 2, 0, 0, ball.radius);
-            radGrad.addColorStop(0, '#ff9f43');
-            radGrad.addColorStop(0.8, '#ee5a24');
-            radGrad.addColorStop(1, '#9e1c00');
-            ctx.fillStyle = radGrad;
+            let gradient = ctx.createRadialGradient(ball.x - 5, ball.y - 5, 2, ball.x, ball.y, ball.radius);
+            gradient.addColorStop(0, '#ff938a');
+            gradient.addColorStop(0.8, ball.color);
+            gradient.addColorStop(1, '#990000');
+            
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = ball.color;
+            ctx.fillStyle = gradient;
             
             ctx.beginPath();
-            ctx.arc(0, 0, ball.radius, 0, Math.PI * 2);
+            ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
             ctx.fill();
-            ctx.strokeStyle = "#000";
-            ctx.lineWidth = 2.5;
-            ctx.stroke();
-
-            // Black Lines on Ball
-            ctx.strokeStyle = "rgba(0,0,0,0.6)";
-            ctx.lineWidth = 1.5;
-            ctx.beginPath(); ctx.arc(0, 0, ball.radius, -Math.PI/3, Math.PI/3); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(-ball.radius, 0); ctx.lineTo(ball.radius, 0); ctx.stroke();
-
             ctx.restore();
 
-            // UI Screens
+            // 4. Game Screen States
             if (!gameStarted && !gameOver) {
-                ctx.fillStyle = "rgba(0,0,0,0.4)";
+                ctx.fillStyle = "rgba(0,0,0,0.5)";
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
                 ctx.fillStyle = "#fff";
-                ctx.font = "bold 22px Arial";
+                ctx.font = "bold 20px Arial";
                 ctx.textAlign = "center";
-                ctx.fillText("TAP TO JUMP & DUNK", canvas.width / 2, canvas.height / 2);
+                ctx.fillText("TOUCH / MOVE TO START RUN", canvas.width / 2, canvas.height / 2);
             }
 
             if (gameOver) {
-                ctx.fillStyle = "rgba(0, 0, 0, 0.8)";
+                ctx.fillStyle = "rgba(5, 5, 8, 0.85)";
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = "#ff3333";
-                ctx.font = "bold 38px Arial";
+                ctx.fillStyle = "#ff2a5f";
+                ctx.font = "bold 36px Arial";
                 ctx.textAlign = "center";
-                ctx.fillText("GAME OVER", canvas.width / 2, canvas.height / 2 - 25);
+                ctx.fillText("GAME OVER", canvas.width / 2, canvas.height / 2 - 20);
                 ctx.fillStyle = "#fff";
-                ctx.font = "bold 18px Arial";
-                ctx.fillText("Tap to Restart", canvas.width / 2, canvas.height / 2 + 20);
+                ctx.font = "bold 16px Arial";
+                ctx.fillText("Tap anywhere to Restart", canvas.width / 2, canvas.height / 2 + 25);
             }
         }
 
+        // Loop Runner
+        let spawnTimer = 0;
         function loop() {
             update();
             draw();
+
+            spawnTimer++;
+            if (spawnTimer > 35) { // Controls item spawn rate
+                spawnItem();
+                spawnTimer = 0;
+            }
             requestAnimationFrame(loop);
         }
 

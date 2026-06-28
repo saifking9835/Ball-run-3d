@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Ball Run 3D</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            background: #111;
+            font-family: 'Arial', sans-serif;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            user-select: none;
+        }
+        #gameCanvas {
+            background: linear-gradient(to bottom, #0f172a, #1e1b4b);
+            box-shadow: 0 0 30px rgba(0,0,0,0.7);
+            display: block;
+        }
+        #ui {
+            position: absolute;
+            top: 20px;
+            color: white;
+            font-size: 30px;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.6);
+            pointer-events: none;
+            z-index: 10;
+            text-align: center;
+            width: 100%;
+        }
+        #instructions {
+            position: absolute;
+            bottom: 30px;
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 16px;
+            pointer-events: none;
+            z-index: 10;
+            text-align: center;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="ui">Score: <span id="score">0</span></div>
+    <div id="instructions">Drag Left / Right to Move Ball</div>
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+        const scoreDisplay = document.getElementById("score");
+
+        // Screen Adjustments for Mobile
+        function resizeCanvas() {
+            canvas.width = window.innerWidth > 450 ? 400 : window.innerWidth;
+            canvas.height = window.innerHeight > 800 ? 700 : window.innerHeight;
+        }
+        resizeCanvas();
+
+        // Game State
+        let score = 0;
+        let gameOver = false;
+        let gameSpeed = 5;
+
+        // Track (Road) Definition
+        const track = {
+            width: 160,
+            x: canvas.width / 2 - 80
+        };
+
+        // Player Ball Properties
+        const ball = {
+            x: canvas.width / 2,
+            y: canvas.height - 150,
+            radius: 15,
+            color: "#ff3b30", // Bright Red 3D Ball Look
+            targetX: canvas.width / 2
+        };
+
+        // Obstacles & Crystals arrays
+        let elements = [];
+
+        function spawnElement() {
+            if (gameOver) return;
+            const isObstacle = Math.random() > 0.4; // 60% obstacles, 40% gems
+            const laneWidth = track.width / 3;
+            const lane = Math.floor(Math.random() * 3); // 3 positions (0, 1, 2)
+            const itemX = track.x + (lane * laneWidth) + laneWidth / 2;
+
+            elements.push({
+                x: itemX,
+                y: -50,
+                type: isObstacle ? 'obstacle' : 'gem',
+                radius: isObstacle ? 16 : 10,
+                color: isObstacle ? '#00f0ff' : '#ffea00' // Neon cyan for obstacle, Yellow/Gold for Gem
+            });
+        }
+
+        // Handle Touch and Drag Controls
+        function handleMove(e) {
+            let clientX;
+            if (e.touches) {
+                clientX = e.touches[0].clientX;
+            } else {
+                clientX = e.clientX;
+            }
+            
+            // Calculate relative position inside canvas
+            const rect = canvas.getBoundingClientRect();
+            const canvasX = clientX - rect.left;
+            
+            // Constrain movement inside track limits
+            if (canvasX >= track.x && canvasX <= track.x + track.width) {
+                ball.targetX = canvasX;
+            }
+        }
+
+        window.addEventListener("mousemove", handleMove);
+        window.addEventListener("touchmove", handleMove, { passive: false });
+        
+        canvas.addEventListener("click", () => {
+            if (gameOver) resetGame();
+        });
+        canvas.addEventListener("touchstart", () => {
+            if (gameOver) resetGame();
+        });
+
+        function resetGame() {
+            score = 0;
+            scoreDisplay.innerText = score;
+            gameOver = false;
+            gameSpeed = 5;
+            elements = [];
+            ball.x = canvas.width / 2;
+            ball.targetX = canvas.width / 2;
+        }
+
+        // Logic Updates
+        function update() {
+            if (gameOver) return;
+
+            // Smooth ball movement sliding
+            ball.x += (ball.targetX - ball.x) * 0.2;
+
+            // Speed increment slowly
+            gameSpeed += 0.001;
+
+            // Process blocks & items
+            for (let i = elements.length - 1; i >= 0; i--) {
+                elements[i].y += gameSpeed;
+
+                // Collision Detection
+                let dx = ball.x - elements[i].x;
+                let dy = ball.y - elements[i].y;
+                let distance = Math.sqrt(dx * dx + dy * dy);
+
+                if (distance < ball.radius + elements[i].radius) {
+                    if (elements[i].type === 'obstacle') {
+                        gameOver = true;
+                    } else {
+                        // Gem collected
+                        score += 10;
+                        scoreDisplay.innerText = score;
+                        elements.splice(i, 1);
+                        continue;
+                    }
+                }
+
+                // Remove out of screen elements
+                if (elements[i] && elements[i].y > canvas.height + 50) {
+                    if (elements[i].type === 'obstacle') score += 1; // pass barrier points
+                    scoreDisplay.innerText = score;
+                    elements.splice(i, 1);
+                }
+            }
+        }
+
+        // Graphics Drawing
+        function draw() {
+            // Clear Screen
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw 3D-perspective Road/Track lines
+            ctx.fillStyle = "#1e293b";
+            ctx.beginPath();
+            ctx.moveTo(track.x, 0);
+            ctx.lineTo(track.x + track.width, 0);
+            ctx.lineTo(track.x + track.width, canvas.height);
+            ctx.lineTo(track.x, canvas.height);
+            ctx.fill();
+
+            // Track borders (Side lines)
+            ctx.strokeStyle = "#475569";
+            ctx.lineWidth = 4;
+            ctx.strokeRect(track.x, 0, track.width, canvas.height);
+
+            // Draw Blocks / Gems
+            elements.forEach(el => {
+                ctx.beginPath();
+                if (el.type === 'obstacle') {
+                    // Obstacle Box/Spike look
+                    ctx.fillStyle = el.color;
+                    ctx.shadowBlur = 10;
+                    ctx.shadowColor = el.color;
+                    ctx.fillRect(el.x - el.radius, el.y - el.radius, el.radius * 2, el.radius * 2);
+                } else {
+                    // Shiny Diamond/Gem look
+                    ctx.fillStyle = el.color;
+                    ctx.shadowBlur = 10;
+                    ctx.shadowColor = el.color;
+                    ctx.arc(el.x, el.y, el.radius, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.shadowBlur = 0; // reset shadow
+            });
+
+            // Draw Player 3D Ball
+            ctx.beginPath();
+            let gradient = ctx.createRadialGradient(ball.x - 4, ball.y - 4, 2, ball.x, ball.y, ball.radius);
+            gradient.addColorStop(0, '#ff8780');
+            gradient.addColorStop(1, ball.color);
+            ctx.fillStyle = gradient;
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = ball.color;
+            ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.shadowBlur = 0; // reset shadow
+
+            // Game Over Text Overlay
+            if (gameOver) {
+                ctx.fillStyle = "rgba(15, 23, 42, 0.85)";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                ctx.fillStyle = "#fff";
+                ctx.font = "bold 32px Arial";
+                ctx.textAlign = "center";
+                ctx.fillText("CRASHED!", canvas.width / 2, canvas.height / 2 - 20);
+                
+                ctx.font = "18px Arial";
+                ctx.fillStyle = "#38bdf8";
+                ctx.fillText("Tap Screen to Restart", canvas.width / 2, canvas.height / 2 + 25);
+            }
+        }
+
+        // Loop Handler
+        let spawnTimer = 0;
+        function gameLoop() {
+            update();
+            draw();
+
+            spawnTimer += 1;
+            if (spawnTimer > 45) { // item spawn speed
+                spawnElement();
+                spawnTimer = 0;
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Initialize Game
+        resetGame();
+        gameLoop();
+    </script>
+</body>
+</html>
